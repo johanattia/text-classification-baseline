@@ -319,31 +319,6 @@ class CharacterConvNet(tf.keras.Model):
         )
         return config
 
-    @classmethod
-    def from_config(cls, config: Dict):
-        config["kernel_initializer"] = tf.keras.initializers.deserialize(
-            config["kernel_initializer"]
-        )
-        config["bias_initializer"] = tf.keras.initializers.deserialize(
-            config["bias_initializer"]
-        )
-        config["kernel_regularizer"] = tf.keras.regularizers.deserialize(
-            config["kernel_regularizer"]
-        )
-        config["bias_regularizer"] = tf.keras.regularizers.deserialize(
-            config["bias_regularizer"]
-        )
-        config["activity_regularizer"] = tf.keras.regularizers.deserialize(
-            config["activity_regularizer"]
-        )
-        config["kernel_constraint"] = tf.keras.constraints.deserialize(
-            config["kernel_constraint"]
-        )
-        config["bias_constraint"] = tf.keras.constraints.deserialize(
-            config["bias_constraint"]
-        )
-        return cls(**config)
-
 
 class TextConvNet(tf.keras.Model):
     """Convolutional Neural Networks for Text Classification

@@ -49,9 +49,9 @@ class MetaClassificationModel(tf.keras.Model):
     ):
         super().__init__(**kwargs)
 
-        if str(aggregation_level).lower() not in ["feature", "classification"]:
+        if str(aggregation_level).lower() not in ["feature", "stacking", "ensembling"]:
             raise ValueError(
-                "`aggregation_level` must be in [`feature`, `classification`]"
+                "`aggregation_level` must be in [`feature`, `stacking`, `ensembling`]"
             )
         self._aggregation_level = str(aggregation_level).lower()
 

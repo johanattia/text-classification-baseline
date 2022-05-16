@@ -1,8 +1,10 @@
 """Inner Attention"""
 
 
-from typing import Callable, Dict, Tuple, Union
+from typing import Callable, Dict, Iterable, Tuple, Union
 import tensorflow as tf
+
+from .feedforward import FeedForwardNetwork
 
 
 class InnerAttention(tf.keras.layers.Layer):
@@ -139,27 +141,159 @@ class InnerAttention(tf.keras.layers.Layer):
         )
         return config
 
-    @classmethod
-    def from_config(cls, config: Dict):
-        config["kernel_initializer"] = tf.keras.initializers.deserialize(
-            config["kernel_initializer"]
+
+class TransformerBlock(tf.keras.layers.Layer):
+    """_summary_
+
+    Args:
+        num_heads (int): _description_
+        embed_dim (int): _description_
+        hidden_dim (int): _description_
+        ffn_output (bool, optional): _description_.
+            Defaults to False.
+        dropout (float, optional): _description_.
+            Defaults to 0.1.
+        epsilon (float, optional): _description_.
+            Defaults to 1e-6.
+        kernel_initializer (Union[str, Callable], optional): _description_.
+            Defaults to "glorot_uniform".
+        bias_initializer (Union[str, Callable], optional): _description_.
+            Defaults to "zeros".
+        kernel_regularizer (Union[str, Callable], optional): _description_.
+            Defaults to None.
+        bias_regularizer (Union[str, Callable], optional): _description_.
+            Defaults to None.
+        activity_regularizer (Union[str, Callable], optional): _description_.
+            Defaults to None.
+        kernel_constraint (Union[str, Callable], optional): _description_.
+            Defaults to None.
+        bias_constraint (Union[str, Callable], optional): _description_.
+            Defaults to None.
+    """
+
+    def __init__(
+        self,
+        num_heads: int,
+        embed_dim: int,
+        hidden_dim: int,
+        ffn_output: bool = False,
+        dropout: float = 0.1,
+        epsilon: float = 1e-6,
+        kernel_initializer: Union[str, Callable] = "glorot_uniform",
+        bias_initializer: Union[str, Callable] = "zeros",
+        kernel_regularizer: Union[str, Callable] = None,
+        bias_regularizer: Union[str, Callable] = None,
+        activity_regularizer: Union[str, Callable] = None,
+        kernel_constraint: Union[str, Callable] = None,
+        bias_constraint: Union[str, Callable] = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        self.num_heads = num_heads
+        self.embed_dim = embed_dim
+        self.hidden_dim = hidden_dim
+        self.ffn_output = ffn_output
+        self.dropout = dropout
+        self.epsilon = epsilon
+
+        self._weights_parameters = dict(
+            kernel_initializer=tf.keras.initializers.get(kernel_initializer),
+            bias_initializer=tf.keras.initializers.get(bias_initializer),
+            kernel_regularizer=tf.keras.regularizers.get(kernel_regularizer),
+            bias_regularizer=tf.keras.regularizers.get(bias_regularizer),
+            activity_regularizer=tf.keras.regularizers.get(activity_regularizer),
+            kernel_constraint=tf.keras.constraints.get(kernel_constraint),
+            bias_constraint=tf.keras.constraints.get(bias_constraint),
         )
-        config["bias_initializer"] = tf.keras.initializers.deserialize(
-            config["bias_initializer"]
+
+    def build(self, input_shape: tf.TensorShape):
+        # Defining Transformer block layers
+        self.attention_layer = tf.keras.layers.MultiHeadAttention(
+            num_heads=self.num_heads,
+            key_dim=self.embed_dim,
+            dropout=self.dropout,
+            use_bias=True,
+            **self._weights_parameters,
         )
-        config["kernel_regularizer"] = tf.keras.regularizers.deserialize(
-            config["kernel_regularizer"]
+
+        self.feed_forward_network = FeedForwardNetwork(
+            hidden_dim=self.hidden_dim,
+            output_dim=self.embed_dim,
+            dropout=self.dropout,
+            use_bias=True,
+            hidden_activation=tf.nn.relu,
+            output_activation=None,
+            **self._weights_parameters,
         )
-        config["bias_regularizer"] = tf.keras.regularizers.deserialize(
-            config["bias_regularizer"]
+
+        self.layer_norm1 = tf.keras.layers.LayerNormalization(epsilon=self.epsilon)
+        self.layer_norm2 = tf.keras.layers.LayerNormalization(epsilon=self.epsilon)
+
+        super().build(input_shape)
+
+    def call(
+        self, inputs: tf.Tensor, training: bool = False, mask: tf.Tensor = None
+    ) -> tf.Tensor:
+        """_summary_
+        Args:
+            inputs (tf.Tensor): _description_
+            training (bool, optional): _description_. Defaults to False.
+            mask (tf.Tensor, optional): _description_. Defaults to None.
+        Returns:
+            tf.Tensor: _description_
+        """
+        attention_output = self.compute_attention(
+            inputs, training=training, attention_mask=mask
         )
-        config["activity_regularizer"] = tf.keras.regularizers.deserialize(
-            config["activity_regularizer"]
+        output1 = self.layer_norm1(inputs + attention_output)
+
+        ffn_output = self.feed_forward_network(output1)
+        output2 = self.layer_norm2(output1 + ffn_output)
+
+        if self.ffn_output:
+            return output2, ffn_output
+
+        return output2
+
+    def compute_attention(
+        self, inputs: tf.Tensor, training: bool, attention_mask: tf.Tensor
+    ) -> tf.Tensor:
+        return self.attention_layer(
+            inputs, inputs, training=training, attention_mask=attention_mask
         )
-        config["kernel_constraint"] = tf.keras.constraints.deserialize(
-            config["kernel_constraint"]
+
+    def get_config(self) -> dict:
+        config = super().get_config()
+        config.update(
+            {
+                "num_heads": self.num_heads,
+                "embed_dim": self.embed_dim,
+                "hidden_dim": self.hidden_dim,
+                "ffn_output": self.ffn_output,
+                "dropout": self.dropout,
+                "epsilon": self.epsilon,
+                "kernel_initializer": tf.keras.initializers.serialize(
+                    self._weights_parameters["kernel_initializer"]
+                ),
+                "bias_initializer": tf.keras.initializers.serialize(
+                    self._weights_parameters["bias_initializer"]
+                ),
+                "kernel_regularizer": self.tf.keras.regularizers.serialize(
+                    self._weights_parameters["kernel_regularizer"]
+                ),
+                "bias_regularizer": self.tf.keras.regularizers.serialize(
+                    self._weights_parameters["bias_regularizer"]
+                ),
+                "activity_regularizer": self.tf.keras.regularizers.serialize(
+                    self._weights_parameters["activity_regularizer"]
+                ),
+                "kernel_constraint": self.tf.keras.constraints.serialize(
+                    self._weights_parameters["kernel_constraint"]
+                ),
+                "bias_constraint": self.tf.keras.constraints.serialize(
+                    self._weights_parameters["bias_constraint"]
+                ),
+            }
         )
-        config["bias_constraint"] = tf.keras.constraints.deserialize(
-            config["bias_constraint"]
-        )
-        return cls(**config)
+        return config
