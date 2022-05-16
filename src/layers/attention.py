@@ -149,7 +149,7 @@ class TransformerBlock(tf.keras.layers.Layer):
         num_heads (int): _description_
         embed_dim (int): _description_
         hidden_dim (int): _description_
-        ffn_output (bool, optional): _description_.
+        post_norm (bool, optional): _description_.
             Defaults to False.
         dropout (float, optional): _description_.
             Defaults to 0.1.
@@ -176,7 +176,7 @@ class TransformerBlock(tf.keras.layers.Layer):
         num_heads: int,
         embed_dim: int,
         hidden_dim: int,
-        ffn_output: bool = False,
+        post_norm: bool = False,
         dropout: float = 0.1,
         epsilon: float = 1e-6,
         kernel_initializer: Union[str, Callable] = "glorot_uniform",
@@ -193,7 +193,7 @@ class TransformerBlock(tf.keras.layers.Layer):
         self.num_heads = num_heads
         self.embed_dim = embed_dim
         self.hidden_dim = hidden_dim
-        self.ffn_output = ffn_output
+        self._post_norm = post_norm
         self.dropout = dropout
         self.epsilon = epsilon
 
@@ -232,29 +232,43 @@ class TransformerBlock(tf.keras.layers.Layer):
 
         super().build(input_shape)
 
-    def call(
+    def _call_with_post_normalization(
         self, inputs: tf.Tensor, training: bool = False, mask: tf.Tensor = None
     ) -> tf.Tensor:
-        """_summary_
-        Args:
-            inputs (tf.Tensor): _description_
-            training (bool, optional): _description_. Defaults to False.
-            mask (tf.Tensor, optional): _description_. Defaults to None.
-        Returns:
-            tf.Tensor: _description_
-        """
+        # MHA block
         attention_output = self.compute_attention(
             inputs, training=training, attention_mask=mask
         )
         output1 = self.layer_norm1(inputs + attention_output)
 
-        ffn_output = self.feed_forward_network(output1)
-        output2 = self.layer_norm2(output1 + ffn_output)
-
-        if self.ffn_output:
-            return output2, ffn_output
+        # Feed-forward block
+        output2 = self.feed_forward_network(output1)
+        output2 = self.layer_norm2(output1 + output2)
 
         return output2
+
+    def _call_with_pre_normalization(
+        self, inputs: tf.Tensor, training: bool = False, mask: tf.Tensor = None
+    ) -> tf.Tensor:
+        # MHA block
+        attention_output = self.compute_attention(
+            self.layer_norm1(inputs), training=training, attention_mask=mask
+        )
+        output1 = inputs + attention_output
+
+        # Feed-forward block
+        output2 = self.feed_forward_network(self.layer_norm2(output1))
+        output2 = output1 + output2
+
+        return output2
+
+    def call(
+        self, inputs: tf.Tensor, training: bool = False, mask: tf.Tensor = None
+    ) -> tf.Tensor:
+        if self._post_norm:
+            return self._call_with_post_normalization(inputs, training, mask)
+
+        return self._call_with_pre_normalization(inputs, training, mask)
 
     def compute_attention(
         self, inputs: tf.Tensor, training: bool, attention_mask: tf.Tensor
@@ -270,7 +284,7 @@ class TransformerBlock(tf.keras.layers.Layer):
                 "num_heads": self.num_heads,
                 "embed_dim": self.embed_dim,
                 "hidden_dim": self.hidden_dim,
-                "ffn_output": self.ffn_output,
+                "post_norm": self._post_norm,
                 "dropout": self.dropout,
                 "epsilon": self.epsilon,
                 "kernel_initializer": tf.keras.initializers.serialize(
