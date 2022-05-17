@@ -1,9 +1,9 @@
 # baseline-text-classification
-Deep Learning Baselines for Text Classification with TensorFlow
+Deep Learning Baselines for Text Classification with TensorFlow. Below the available implementations:
 
-## Available Models
-* Convolutional Neural Networks from [Character-level Convolutional Networks for Text Classification](https://arxiv.org/pdf/1509.01626.pdf) and [A Sensitivity Analysis of (and Practitioners’ Guide to) Convolutional Neural Networks for Sentence Classification](https://arxiv.org/pdf/1510.03820.pdf)
-* Multi-components models aggregating (sub)word-level RNN, character-level CNN and TF-IDF+MLP architectures
+## Convolutional Neural Networks
+* [Character-level Convolutional Networks for Text Classification](https://arxiv.org/pdf/1509.01626.pdf) 
+* [A Sensitivity Analysis of (and Practitioners’ Guide to) Convolutional Neural Networks for Sentence Classification](https://arxiv.org/pdf/1510.03820.pdf)
 
 ## Next steps: Language Models fine-tuning
 Some useful resources and frameworks to fine BERT-like Language Models:
