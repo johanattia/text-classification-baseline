@@ -6,14 +6,19 @@ import tensorflow as tf
 
 
 def conv_block_v2(
-    filters: int, kernel_size: int, block_id: int, pool_size: int = None, **kwargs
+    filters: int,
+    kernel_size: int,
+    block_id: int,
+    activation: Union[str, Callable] = tf.nn.relu,
+    pool_size: int = None,
+    **kwargs,
 ):
     layers = [
         tf.keras.layers.Conv1D(
             filters=filters,
             kernel_size=kernel_size,
             padding="same",
-            activation=tf.nn.relu,
+            activation=activation,
             name=f"conv{block_id}",
             **kwargs,
         )

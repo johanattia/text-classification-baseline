@@ -63,7 +63,6 @@ class TextClassificationModel(tf.keras.Model):
 
         # Classification head
         self.classification_head = None
-
         if self._include_top:
             self.classification_head = self._build_classification_head()
 

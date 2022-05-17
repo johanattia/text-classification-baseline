@@ -1,7 +1,7 @@
 """Inner Attention"""
 
 
-from typing import Callable, Dict, Iterable, Tuple, Union
+from typing import Callable, Dict, Tuple, Union
 import tensorflow as tf
 
 from .feedforward import FeedForwardNetwork
