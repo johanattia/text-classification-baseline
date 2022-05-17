@@ -5,6 +5,26 @@ from typing import Callable, Union
 import tensorflow as tf
 
 
+def conv_block_v2(
+    filters: int, kernel_size: int, block_id: int, pool_size: int = None, **kwargs
+):
+    layers = [
+        tf.keras.layers.Conv1D(
+            filters=filters,
+            kernel_size=kernel_size,
+            padding="same",
+            activation=tf.nn.relu,
+            name=f"conv{block_id}",
+            **kwargs,
+        )
+    ]
+    if pool_size is not None:
+        layers += [
+            tf.keras.layers.MaxPool1D(pool_size=pool_size, name=f"pooling{block_id}")
+        ]
+    return tf.keras.Sequential(layers)
+
+
 def conv_block(
     x: tf.Tensor,
     filters: int,
