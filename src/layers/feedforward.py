@@ -1,8 +1,47 @@
 """Single-hidden Layer Feed Forward Network"""
 
 
-from typing import Callable, Union
+from typing import Callable, Iterable, Union
+import itertools
+
 import tensorflow as tf
+
+
+def FeedForwardNetworkv2(
+    output_units: int = None,
+    hidden_units: Iterable[int] = [],
+    output_activation: Union[str, Callable] = None,
+    hidden_activation: Union[str, Callable] = None,
+    use_bias: bool = True,
+    dropout: float = 0.5,
+    **kwargs,
+):
+    layers = list(
+        itertools.chain.from_iterable(
+            [
+                [
+                    tf.keras.layers.Dense(
+                        units=units,
+                        activation=hidden_activation,
+                        use_bias=use_bias,
+                        **kwargs,
+                    ),
+                    tf.keras.layers.Dropout(rate=dropout),
+                ]
+                for units in hidden_units
+            ]
+        )
+    )
+    if output_units is not None:
+        layers += [
+            tf.keras.layers.Dense(
+                units=output_units,
+                activation=output_activation,
+                use_bias=use_bias,
+                **kwargs,
+            )
+        ]
+    return tf.keras.Sequential(layers)
 
 
 def FeedForwardNetwork(
@@ -21,31 +60,6 @@ def FeedForwardNetwork(
     bias_constraint: Union[str, Callable] = None,
     **kwargs,
 ) -> tf.keras.Model:
-    """_summary_
-    Args:
-        hidden_dim (int): _description_
-        output_dim (int): _description_
-        hidden_activation (Union[str, Callable], optional): _description_.
-            Defaults to None.
-        output_activation (Union[str, Callable], optional): _description_.
-            Defaults to None.
-        kernel_initializer (Union[str, Callable], optional): _description_.
-            Defaults to "glorot_uniform".
-        bias_initializer (Union[str, Callable], optional): _description_.
-            Defaults to "zeros".
-        kernel_regularizer (Union[str, Callable], optional): _description_.
-            Defaults to None.
-        bias_regularizer (Union[str, Callable], optional): _description_.
-            Defaults to None.
-        activity_regularizer (Union[str, Callable], optional): _description_.
-            Defaults to None.
-        kernel_constraint (Union[str, Callable], optional): _description_.
-            Defaults to None.
-        bias_constraint (Union[str, Callable], optional): _description_.
-            Defaults to None.
-    Returns:
-        tf.keras.Model: _description_
-    """
     return tf.keras.Sequential(
         [
             tf.keras.layers.Dense(

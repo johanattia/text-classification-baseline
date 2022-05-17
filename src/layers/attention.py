@@ -13,19 +13,19 @@ class InnerAttention(tf.keras.layers.Layer):
     Args:
         units (int): _description_
         normalize (bool): _description_
-        kernel_initializer (Union[str, Callable], optional): _description_.
+        kernel_initializer (str or callable): _description_.
             Defaults to "glorot_uniform".
-        bias_initializer (Union[str, Callable], optional): _description_.
+        bias_initializer (str or callable): _description_.
             Defaults to "zeros".
-        kernel_regularizer (Union[str, Callable], optional): _description_.
+        kernel_regularizer (str or callable): _description_.
             Defaults to None.
-        bias_regularizer (Union[str, Callable], optional): _description_.
+        bias_regularizer (str or callable): _description_.
             Defaults to None.
-        activity_regularizer (Union[str, Callable], optional): _description_.
+        activity_regularizer (str or callable): _description_.
             Defaults to None.
-        kernel_constraint (Union[str, Callable], optional): _description_.
+        kernel_constraint (str or callable): _description_.
             Defaults to None.
-        bias_constraint (Union[str, Callable], optional): _description_.
+        bias_constraint (str or callable): _description_.
             Defaults to None.
     """
 
@@ -44,7 +44,7 @@ class InnerAttention(tf.keras.layers.Layer):
     ):
         super(InnerAttention, self).__init__(**kwargs)
 
-        self._units = units
+        self.units = units
         self._normalize = normalize
 
         self._weights_parameters = dict(
@@ -62,7 +62,7 @@ class InnerAttention(tf.keras.layers.Layer):
         # with sequence elements
         self.context_query = self.add_weight(
             name="context_query",
-            shape=[self._units, 1],
+            shape=[self.units, 1],
             dtype=tf.float32,
             initializer=self._weights_parameters["kernel_initializer"],
             regularizer=self._weights_parameters["kernel_regularizer"],
@@ -72,7 +72,7 @@ class InnerAttention(tf.keras.layers.Layer):
 
         self.softmax = tf.keras.layers.Softmax(axis=1)
         self.dense = tf.keras.layers.Dense(
-            units=self._units,
+            units=self.units,
             activation=tf.nn.relu,
             use_bias=True,
             **self._weights_parameters,
@@ -114,7 +114,7 @@ class InnerAttention(tf.keras.layers.Layer):
         config = super().get_config()
         config.update(
             {
-                "units": self._units,
+                "units": self.units,
                 "normalize": self._normalize,
                 "kernel_initializer": tf.keras.initializers.serialize(
                     self._weights_parameters["kernel_initializer"]
@@ -149,25 +149,25 @@ class TransformerBlock(tf.keras.layers.Layer):
         num_heads (int): _description_
         embed_dim (int): _description_
         hidden_dim (int): _description_
-        post_norm (bool, optional): _description_.
-            Defaults to False.
-        dropout (float, optional): _description_.
+        post_norm (bool): _description_.
+            Defaults to True.
+        dropout (float): _description_.
             Defaults to 0.1.
-        epsilon (float, optional): _description_.
+        epsilon (float): _description_.
             Defaults to 1e-6.
-        kernel_initializer (Union[str, Callable], optional): _description_.
+        kernel_initializer (str or callable): _description_.
             Defaults to "glorot_uniform".
-        bias_initializer (Union[str, Callable], optional): _description_.
+        bias_initializer (str or callable): _description_.
             Defaults to "zeros".
-        kernel_regularizer (Union[str, Callable], optional): _description_.
+        kernel_regularizer (str or callable): _description_.
             Defaults to None.
-        bias_regularizer (Union[str, Callable], optional): _description_.
+        bias_regularizer (str or callable): _description_.
             Defaults to None.
-        activity_regularizer (Union[str, Callable], optional): _description_.
+        activity_regularizer (str or callable): _description_.
             Defaults to None.
-        kernel_constraint (Union[str, Callable], optional): _description_.
+        kernel_constraint (str or callable): _description_.
             Defaults to None.
-        bias_constraint (Union[str, Callable], optional): _description_.
+        bias_constraint (str or callable): _description_.
             Defaults to None.
     """
 
@@ -176,7 +176,7 @@ class TransformerBlock(tf.keras.layers.Layer):
         num_heads: int,
         embed_dim: int,
         hidden_dim: int,
-        post_norm: bool = False,
+        post_norm: bool = True,
         dropout: float = 0.1,
         epsilon: float = 1e-6,
         kernel_initializer: Union[str, Callable] = "glorot_uniform",

@@ -10,34 +10,7 @@ On top : attention (https://arxiv.org/pdf/1703.03130.pdf) + Variable Selection N
 from typing import Dict
 import tensorflow as tf
 
-
-def ClassificationHead(
-    n_classes: int,
-    dropout: float,
-    name: str,
-    kernel_initializer="glorot_uniform",
-    bias_initializer="zeros",
-    kernel_regularizer=None,
-    bias_regularizer=None,
-    activity_regularizer=None,
-    kernel_constraint=None,
-    bias_constraint=None,
-) -> tf.keras.Model:
-    return tf.keras.Sequential(
-        [
-            tf.keras.layers.Dense(
-                units=n_classes,
-                kernel_initializer=kernel_initializer,
-                bias_initializer=bias_initializer,
-                kernel_regularizer=kernel_regularizer,
-                bias_regularizer=bias_regularizer,
-                activity_regularizer=activity_regularizer,
-                kernel_constraint=kernel_constraint,
-                bias_constraint=bias_constraint,
-            )
-        ],
-        name=name,
-    )
+from ..layers.feedforward import FeedForwardNetwork
 
 
 class MetaClassificationModel(tf.keras.Model):

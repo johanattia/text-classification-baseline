@@ -3,43 +3,70 @@
 from typing import Callable, Dict, Union
 import tensorflow as tf
 
+from .text_model import TextClassificationModel
+from ..layers.conv import conv_block
+from ..utils import conv_utils
 
-def conv_block(
-    x: tf.Tensor,
-    filters: int,
-    kernel_size: int,
-    block_id: int,
-    pool_size: int = None,
-    kernel_initializer: Union[str, Callable] = "glorot_uniform",
-    bias_initializer: Union[str, Callable] = "zeros",
-    kernel_regularizer: Union[str, Callable] = None,
-    bias_regularizer: Union[str, Callable] = None,
-    activity_regularizer: Union[str, Callable] = None,
-    kernel_constraint: Union[str, Callable] = None,
-    bias_constraint: Union[str, Callable] = None,
-) -> tf.Tensor:
-    """_summary_"""
-    x = tf.keras.layers.Conv1D(
-        filters=filters,
-        kernel_size=kernel_size,
-        padding="same",
-        activation=tf.nn.relu,
-        name="conv" + str(block_id),
-        kernel_initializer=kernel_initializer,
-        bias_initializer=bias_initializer,
-        kernel_regularizer=kernel_regularizer,
-        bias_regularizer=bias_regularizer,
-        activity_regularizer=activity_regularizer,
-        kernel_constraint=kernel_constraint,
-        bias_constraint=bias_constraint,
-    )(x)
 
-    if pool_size is not None:
-        x = tf.keras.layers.MaxPool1D(
-            pool_size=pool_size, name="pooling" + str(block_id)
-        )(x)
+class CharacterConvNetv2(TextClassificationModel):
+    def __init__(
+        self,
+        include_top: bool,
+        n_classes: int = None,
+        output_sequence_length: int = None,
+        char_embedding: bool = False,
+        embed_dim: int = None,
+        dropout: float = 0.5,
+        backbone_size: str = "small",
+        kernel_initializer: Union[str, Callable] = "glorot_uniform",
+        bias_initializer: Union[str, Callable] = "zeros",
+        embeddings_initializer: Union[str, Callable] = "uniform",
+        kernel_regularizer: Union[str, Callable] = None,
+        bias_regularizer: Union[str, Callable] = None,
+        embeddings_regularizer: Union[str, Callable] = None,
+        activity_regularizer: Union[str, Callable] = None,
+        kernel_constraint: Union[str, Callable] = None,
+        bias_constraint: Union[str, Callable] = None,
+        embeddings_constraint: Union[str, Callable] = None,
+        **kwargs,
+    ):
+        super().__init__(
+            include_top,
+            n_classes,
+            kernel_initializer,
+            bias_initializer,
+            embeddings_initializer,
+            kernel_regularizer,
+            bias_regularizer,
+            embeddings_regularizer,
+            activity_regularizer,
+            kernel_constraint,
+            bias_constraint,
+            embeddings_constraint,
+            **kwargs,
+        )
 
-    return x
+    def _build_feature_encoder(self):
+        raise NotImplementedError(
+            "`_build_feature_encoder` must be implemented in child class."
+        )
+
+    def _build_classification_head(self):
+        raise NotImplementedError(
+            "`_build_classifier` must be implemented in child class."
+        )
+
+    def _process_text_input(self, inputs: tf.Tensor) -> tf.Tensor:
+        raise NotImplementedError(
+            "`_process_text_input` must be implemented in child class."
+        )
+
+    def build_from_text_dataset(
+        self, dataset: tf.data.Dataset, as_supervised: bool = True
+    ):
+        raise NotImplementedError(
+            "`build_from_text_dataset` must be implemented in child class."
+        )
 
 
 class CharacterConvNet(tf.keras.Model):
@@ -55,7 +82,7 @@ class CharacterConvNet(tf.keras.Model):
         dropout=0.5,
         output_sequence_length=128
     )
-    character_cnn.initialize_from_text_dataset(dataset, as_supervised=True)
+    character_cnn.build_from_text_dataset(dataset, as_supervised=True)
 
     character_cnn.compile(optimizer="adam", loss="categorical_crossentropy")
     history = character_cnn.fit(dataset, epochs=20)
@@ -71,7 +98,7 @@ class CharacterConvNet(tf.keras.Model):
             Defaults to None.
         dropout (float, optional): _description_.
             Defaults to 0.4.
-        network_size (str, optional): _description_.
+        backbone_size (str, optional): _description_.
             Defaults to "small".
         kernel_initializer (Union[str, Callable], optional): _description_.
             Defaults to "glorot_uniform".
@@ -93,10 +120,6 @@ class CharacterConvNet(tf.keras.Model):
             Defaults to None.
         embeddings_constraint (Union[str, Callable], optional): _description_.
             Defaults to None.
-
-    Raises:
-        ValueError: _description_
-        ValueError: _description_
     """
 
     def __init__(
@@ -106,8 +129,8 @@ class CharacterConvNet(tf.keras.Model):
         output_sequence_length: int,
         char_embedding: bool = False,
         embed_dim: int = None,
-        dropout: float = 0.4,
-        network_size: str = "small",
+        dropout: float = 0.5,
+        backbone_size: str = "small",
         kernel_initializer: Union[str, Callable] = "glorot_uniform",
         bias_initializer: Union[str, Callable] = "zeros",
         embeddings_initializer: Union[str, Callable] = "uniform",
@@ -118,35 +141,37 @@ class CharacterConvNet(tf.keras.Model):
         kernel_constraint: Union[str, Callable] = None,
         bias_constraint: Union[str, Callable] = None,
         embeddings_constraint: Union[str, Callable] = None,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
 
-        if str(network_size).lower() not in ["small", "large"]:
-            raise ValueError("`conv_size` must be equal to `small` or `large`")
-
-        if char_embedding and embed_dim is None:
-            raise ValueError(
-                "`embed_dim` must be given when `char_embedding` is `True`"
-            )
-
         self._include_top = include_top
-        self._network_size = network_size
         self.n_classes = n_classes
-        self._droput = dropout
         self.output_sequence_length = output_sequence_length
+
+        char_embedding, embed_dim = conv_utils.check_character_embedding(
+            char_embedding, embed_dim
+        )
         self._char_embedding = char_embedding
         self.embed_dim = embed_dim
 
-        # TEXT PROCESSING
-        self.char_vectorizer = tf.keras.layers.TextVectorization(
-            standardize="lower",
-            split="character",
-            output_mode="int",
-            output_sequence_length=self.output_sequence_length,
-        )
+        self.dropout_ = dropout
+        self.backbone_size = conv_utils.normalize_backbone_size(backbone_size)
 
-        # NN PARAMETERS
+        # TEXT VECTORIZATION
+        if self._char_embedding:
+            self.char_vectorizer = tf.keras.layers.TextVectorization(
+                standardize="lower",
+                split="character",
+                output_mode="int",
+                output_sequence_length=self.output_sequence_length,
+            )
+        else:
+            self.char_vectorizer = tf.keras.layers.TextVectorization(
+                standardize="lower", split="character", output_mode="multi_hot"
+            )
+
+        # MODEL WEIGHTS PARAMETERS
         self._weights_parameters = dict(
             kernel_initializer=tf.keras.initializers.get(kernel_initializer),
             bias_initializer=tf.keras.initializers.get(bias_initializer),
@@ -163,7 +188,7 @@ class CharacterConvNet(tf.keras.Model):
             embeddings_constraint=embeddings_constraint,
         )
 
-        self._is_initialized_from_texts = None
+        self._is_built_from_texts = None
 
     def build(self, input_shape: tf.TensorShape):
 
@@ -172,33 +197,33 @@ class CharacterConvNet(tf.keras.Model):
 
         # MLP CLASSIFIER
         if self._include_top:
-            units_ = 1024 if self._network_size == "small" else 2048
-            self.fc_classifier = tf.keras.Sequential(
+            units_ = 1024 if self.backbone_size == "small" else 2048
+            self.mlp_classifier = tf.keras.Sequential(
                 [
                     tf.keras.layers.Dense(
                         units=units_,
                         activation=tf.nn.relu,
                         use_bias=True,
-                        **self._weights_parameters
+                        **self._weights_parameters,
                     ),
-                    tf.keras.layers.Dropout(rate=0.5),
+                    tf.keras.layers.Dropout(rate=self.dropout_),
                     tf.keras.layers.Dense(
                         units=units_,
                         activation=tf.nn.relu,
                         use_bias=True,
-                        **self._weights_parameters
+                        **self._weights_parameters,
                     ),
-                    tf.keras.layers.Dropout(rate=0.5),
+                    tf.keras.layers.Dropout(rate=self.dropout_),
                     tf.keras.layers.Dense(
                         units=self.n_classes,
                         activation=None,
                         use_bias=True,
-                        **self._weights_parameters
+                        **self._weights_parameters,
                     ),
                 ]
             )
         else:
-            self.fc_classifier = None
+            self.mlp_classifier = None
 
         super().build(input_shape)
 
@@ -211,7 +236,7 @@ class CharacterConvNet(tf.keras.Model):
         Returns:
             tf.keras.Model: _description_
         """
-        filters_ = 256 if self._network_size == "small" else 1024
+        filters_ = 256 if self.backbone_size == "small" else 1024
 
         if self._char_embedding:
             inputs = tf.keras.Input(shape=(self.output_sequence_length, self.embed_dim))
@@ -232,7 +257,7 @@ class CharacterConvNet(tf.keras.Model):
 
         return tf.keras.Model(inputs=inputs, outputs=x, name=name)
 
-    def initialize_from_text_dataset(
+    def build_from_text_dataset(
         self, dataset: tf.data.Dataset, as_supervised: bool = True
     ) -> tf.data.Dataset:
         """_summary_
@@ -253,33 +278,28 @@ class CharacterConvNet(tf.keras.Model):
             self.char_embedding = tf.keras.layers.Embedding(
                 input_dim=self.character_vectorizer.vocabulary_size(),
                 output_dim=self.embed_dim,
-                **self._embedding_parameters
+                **self._embedding_parameters,
             )
 
-        self._is_initialized_from_texts = True
+        self._is_built_from_texts = True
 
     def call(self, inputs: tf.Tensor, training: bool = None):
-        """_summary_
-
-        Args:
-            inputs (tf.Tensor): _description_
-            training (bool, optional): _description_. Defaults to None.
-
-        Returns:
-            _type_: _description_
-        """
+        # Vectorization: (B,) -> (B, L)
         indices = self.char_vectorizer(inputs)
 
+        # (B, L) -> (B, L, F1)
         if self._char_embedding:
             indices = self.char_embedding(indices)
         else:
             indices = tf.one_hot(
                 indices=indices, depth=self.char_vectorizer.vocabulary_size()
             )
+
+        # Features: (B, L, F2)
         features = self.conv_encoder(indices)
 
         if self._include_top:
-            return self.fc_classifier(features, training=training)
+            return self.mlp_classifier(features, training=training)
 
         return features
 
@@ -289,11 +309,11 @@ class CharacterConvNet(tf.keras.Model):
             {
                 "include_top": self._include_top,
                 "n_classes": self.n_classes,
-                "dropout": self._dropout,
+                "dropout": self.dropout_,
                 "output_sequence_length": self.output_sequence_length,
                 "char_embedding": self._char_embedding,
                 "embed_dim": self.embed_dim,
-                "network_size": self._network_size,
+                "backbone_size": self.backbone_size,
                 "kernel_initializer": tf.keras.initializers.serialize(
                     self._weights_parameters["kernel_initializer"]
                 ),
