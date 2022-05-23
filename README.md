@@ -1,4 +1,4 @@
-# baseline-text-classification
+# text-classification-baseline
 Deep Learning baseline for text classification with TensorFlow. Below available models:
 
 ## Convolutional Neural Networks
